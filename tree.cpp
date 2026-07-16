@@ -140,3 +140,185 @@ void Tree::loadFromCSV(const string& filename) {
     file.close();
     resolvePendingNodes();
 }
+void Tree::showSuccessionLine() {
+    if (root == nullptr) {
+        cout << "La familia no tiene miembros registrados." << endl;
+        return;
+    }
+    cout << "\n--- MIEMBROS VIVOS DE LA FAMILIA ---" << endl;
+    printSuccessionRecursive(root);
+    cout << "------------------------------------" << endl;
+}
+
+void Tree::printSuccessionRecursive(Node* current) {
+    if (current == nullptr) return;
+
+    if (!current->is_dead) {
+        cout << "ID: " << current->id << " | " << current->name << " " << current->last_name 
+             << " | Edad: " << current->age << " | ";
+        if (current->is_boss) {
+            cout << "[BOSS ACTUAL]";
+        } else if (current->in_jail) {
+            cout << "[EN PRISION (Sucesion bloqueada)]";
+        } else {
+            cout << "[Sucesor Libre]";
+        }
+        cout << endl;
+    }
+
+    printSuccessionRecursive(current->left);
+    printSuccessionRecursive(current->right);
+}
+
+Node* Tree::searchMember(int id) {
+    return findNodeInTree(root, id);
+}
+
+bool Tree::modifyMember(int id, string newName, string newLastName, char newGender, int newAge, bool newIsDead, bool newInJail) {
+    Node* member = searchMember(id);
+    if (member == nullptr) return false;
+    
+    member->name = newName;
+    member->last_name = newLastName;
+    member->gender = newGender;
+    member->age = newAge;
+    member->is_dead = newIsDead;
+    member->in_jail = newInJail;
+    return true;
+}
+
+// Buscar el primer sucesor vivo y libre dentro de una rama recursivamente
+Node* Tree::findFirstFreeSuccessor(Node* current, bool allowJail) {
+    if (current == nullptr) return nullptr;
+
+    if (!current->is_dead) {
+        if (allowJail || !current->in_jail) {
+            return current;
+        }
+    }
+
+    Node* foundLeft = findFirstFreeSuccessor(current->left, allowJail);
+    if (foundLeft != nullptr) return foundLeft;
+
+    return findFirstFreeSuccessor(current->right, allowJail);
+}
+
+// Aplicación secuencial de las reglas de sucesión de la mafia
+Node* Tree::findNewBossRules(Node* deadBoss) {
+    if (deadBoss == nullptr) return nullptr;
+
+    Node* candidate = nullptr;
+
+    // Regla 1: Primer sucesor libre de su propio árbol
+    candidate = findFirstFreeSuccessor(deadBoss->left);
+    if (candidate != nullptr) return candidate;
+    candidate = findFirstFreeSuccessor(deadBoss->right);
+    if (candidate != nullptr) return candidate;
+
+    Node* formerBoss = deadBoss->parent;
+    if (formerBoss != nullptr) {
+        Node* sibling = (formerBoss->left == deadBoss) ? formerBoss->right : formerBoss->left;
+
+        if (sibling != nullptr) {
+            // Regla 2: Primer sucesor del árbol de su hermano
+            candidate = findFirstFreeSuccessor(sibling);
+            if (candidate != nullptr) return candidate;
+
+            // Regla 3: Si el hermano está libre, vivo y sin descendencia, él asume
+            if (!sibling->is_dead && !sibling->in_jail && sibling->left == nullptr && sibling->right == nullptr) {
+                return sibling;
+            }
+        }
+
+        // Regla 4: Árbol del compañero del anterior jefe (El tío)
+        Node* grandBoss = formerBoss->parent;
+        if (grandBoss != nullptr) {
+            Node* uncle = (grandBoss->left == formerBoss) ? grandBoss->right : grandBoss->left;
+            if (uncle != nullptr) {
+                candidate = findFirstFreeSuccessor(uncle);
+                if (candidate != nullptr) return candidate;
+
+                if (!uncle->is_dead && !uncle->in_jail && uncle->left == nullptr && uncle->right == nullptr) {
+                    return uncle;
+                }
+            }
+        }
+    }
+
+    // Regla 5: Buscar jefe más cercano con dos sucesores libres
+    Node* temp = deadBoss->parent;
+    while (temp != nullptr) {
+        if (temp->left != nullptr && temp->right != nullptr) {
+            candidate = findFirstFreeSuccessor(temp->left);
+            if (candidate != nullptr) return candidate;
+            candidate = findFirstFreeSuccessor(temp->right);
+            if (candidate != nullptr) return candidate;
+        }
+        temp = temp->parent;
+    }
+
+    // Regla 6: En caso de crisis absoluta, permitir sucesores en prisión (vivos)
+    candidate = findFirstFreeSuccessor(deadBoss->left, true);
+    if (candidate != nullptr) return candidate;
+    candidate = findFirstFreeSuccessor(deadBoss->right, true);
+    if (candidate != nullptr) return candidate;
+
+    temp = deadBoss->parent;
+    while (temp != nullptr) {
+        if (!temp->is_dead) return temp;
+        candidate = findFirstFreeSuccessor(temp->left, true);
+        if (candidate != nullptr) return candidate;
+        candidate = findFirstFreeSuccessor(temp->right, true);
+        if (candidate != nullptr) return candidate;
+        temp = temp->parent;
+    }
+
+    return nullptr;
+}
+
+Node* Tree::findActualBoss(Node* current) {
+    if (current == nullptr) return nullptr;
+    if (current->is_boss) return current;
+
+    Node* foundLeft = findActualBoss(current->left);
+    if (foundLeft != nullptr) return foundLeft;
+
+    return findActualBoss(current->right);
+}
+
+void Tree::checkAndHandleSuccession() {
+    Node* currentBoss = findActualBoss(root);
+
+    if (currentBoss == nullptr) {
+        if (root != nullptr) {
+            root->is_boss = true;
+            currentBoss = root;
+        } else {
+            return;
+        }
+    }// El jefe abdica si muere, va a prisión o pasa de los 70 años
+    if (currentBoss->is_dead || currentBoss->in_jail || currentBoss->age > 70) {
+        cout << "\n=============================================" << endl;
+        cout << "   ATENCION: EL CAPO HA DEJADO EL PUESTO" << endl;
+        cout << "=============================================" << endl;
+        cout << "Nombre: " << currentBoss->name << " " << currentBoss->last_name << endl;
+        cout << "Causa: ";
+        if (currentBoss->is_dead) cout << "Fallecimiento." << endl;
+        else if (currentBoss->in_jail) cout << "Encarcelamiento." << endl;
+        else cout << "Retiro por vejez (" << currentBoss->age << " anos)." << endl;
+
+        Node* newBoss = findNewBossRules(currentBoss);
+
+        if (newBoss != nullptr) {
+            currentBoss->is_boss = false;
+            currentBoss->was_boss = true;
+            newBoss->is_boss = true;
+            cout << "---------------------------------------------" << endl;
+            cout << ">>> EL NUEVO DON ES: " << newBoss->name << " " << newBoss->last_name 
+                 << " (ID: " << newBoss->id << ") <<<" << endl;
+            cout << "=============================================\n" << endl;
+        } else {
+            cout << "La familia ha quedado sin un heredero apto." << endl;
+        }
+    }
+}
