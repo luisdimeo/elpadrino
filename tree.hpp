@@ -1,7 +1,7 @@
 #ifndef TREE_HPP
 #define TREE_HPP
 
-#include "Node.hpp" // <-- Cambiado a .hpp
+#include "nodo.hpp" // <-- Cambiado a .hpp
 #include <string>
 
 class Tree {
