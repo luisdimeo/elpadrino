@@ -148,3 +148,38 @@ void Tree::loadFromCSV(const string& filename) {
     // Resolver los que quedaron huérfanos temporalmente
     resolvePendingNodes();
 }
+
+
+
+
+// MÉTODOS DE LA FASE 4: VISUALIZACIÓN Y EDICIÓN
+
+// Buscar miembro por ID para edición (interfaz pública)
+Node* Tree::searchMember(int id) {
+    return findNodeInTree(root, id);
+}
+
+// Mostrar línea de sucesión (Solo vivos) en Preorden
+void Tree::printSuccessionRecursive(Node* current) {
+    if (current == nullptr) return;
+
+    if (!current->is_dead) {
+        cout << "- " << current->name << " " << current->last_name 
+             << " [ID: " << current->id << "] "
+             << (current->is_boss ? " (JEFE ACTUAL)" : "") 
+             << (current->in_jail ? " [EN PRISIÓN]" : "") << endl;
+    }
+
+    printSuccessionRecursive(current->left);
+    printSuccessionRecursive(current->right);
+}
+
+void Tree::showSuccessionLine() {
+    if (root == nullptr) {
+        cout << "La familia no tiene miembros cargados." << endl;
+        return;
+    }
+    cout << "--- LINEA DE SUCESIÓN ACTUAL (MIEMBROS VIVOS) ---" << endl;
+    printSuccessionRecursive(root);
+    cout << "------------------------------------------------" << endl;
+}
