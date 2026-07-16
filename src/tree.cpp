@@ -183,3 +183,18 @@ void Tree::showSuccessionLine() {
     printSuccessionRecursive(root);
     cout << "------------------------------------------------" << endl;
 }
+
+// Modificar datos (protegiendo id e id_boss)
+bool Tree::modifyMember(int id, string newName, string newLastName, char newGender, int newAge, bool newIsDead, bool newInJail) {
+    Node* member = searchMember(id);
+    if (member == nullptr) return false;
+
+    member->name = newName;
+    member->last_name = newLastName;
+    member->gender = newGender;
+    member->age = newAge;
+    member->is_dead = newIsDead;
+    member->in_jail = newInJail;
+
+    return true;
+}
