@@ -26,3 +26,24 @@ private:
     Node* findFirstFreeSuccessor(Node* current, bool allowJail = false);
     Node* findNewBossRules(Node* deadBoss);
     
+    public:
+    Tree();
+    ~Tree();
+
+    // Requisito 1: Cargar CSV
+    void loadFromCSV(const std::string& filename);
+    bool insertNodeDirectly(Node* parentNode, Node* newNode);
+
+    // Requisito 2: Mostrar línea de sucesión
+    void showSuccessionLine();
+
+    // Requisito 3: Sucesión automática
+    void checkAndHandleSuccession();
+    Node* findActualBoss(Node* current);
+
+    // Requisito 4: Modificar datos
+    Node* searchMember(int id);
+    bool modifyMember(int id, std::string newName, std::string newLastName, char newGender, int newAge, bool newIsDead, bool newInJail);
+};
+
+#endif
