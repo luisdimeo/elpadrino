@@ -5,13 +5,11 @@
 
 using namespace std;
 
-// Constructor 
 Tree::Tree() {
     root = nullptr;
     pendingListHead = nullptr;
 }
 
-// Destructor para evitar fugas de memoria 
 Tree::~Tree() {
     clearTree(root);
     ListNode* current = pendingListHead;
@@ -23,7 +21,6 @@ Tree::~Tree() {
     }
 }
 
-// Función auxiliar para limpiar el árbol 
 void Tree::clearTree(Node* current) {
     if (current != nullptr) {
         clearTree(current->left);
@@ -32,66 +29,64 @@ void Tree::clearTree(Node* current) {
     }
 }
 
-// ==========================================
-// MÉTODOS DE LA FASE 3: CARGA DEL CSV
-// ==========================================
-
-// Buscar un nodo por ID de forma recursiva (¡Indispensable para poder cargar!)
-Node* Tree::findNodeInTree(Node* current, int id) {
-    if (current == nullptr) return nullptr;
-    if (current->id == id) return current;
-
-    Node* found = findNodeInTree(current->left, id);
-    if (found != nullptr) return found;
-
-    return findNodeInTree(current->right, id);
-}
-
-// Insertar en la lista de pendientes si el jefe no existe todavía en el árbol
 void Tree::insertPending(Node* node) {
     ListNode* newNode = new ListNode(node);
     newNode->next = pendingListHead;
     pendingListHead = newNode;
 }
 
-// Intentar conectar los nodos que quedaron pendientes
+Node* Tree::findNodeInTree(Node* current, int id) {
+    if (current == nullptr) return nullptr;
+    if (current->id == id) return current;
+
+    Node* foundLeft = findNodeInTree(current->left, id);
+    if (foundLeft != nullptr) return foundLeft;
+
+    return findNodeInTree(current->right, id);
+}
+
+bool Tree::insertNodeDirectly(Node* parentNode, Node* newNode) {
+    if (parentNode->left == nullptr) {
+        parentNode->left = newNode;
+        newNode->parent = parentNode;
+        return true;
+    } else if (parentNode->right == nullptr) {
+        parentNode->right = newNode;
+        newNode->parent = parentNode;
+        return true;
+    }
+    return false; 
+}
+
 void Tree::resolvePendingNodes() {
-    bool movement = true;
-    while (movement) {
-        movement = false;
+    bool progress = true;
+    while (progress) {
+        progress = false;
         ListNode* prev = nullptr;
-        ListNode* curr = pendingListHead;
+        ListNode* current = pendingListHead;
 
-        while (curr != nullptr) {
-            Node* potentialParent = findNodeInTree(root, curr->treeNode->id_boss);
-            if (potentialParent != nullptr) {
-                // Insertar en el árbol
-                curr->treeNode->parent = potentialParent;
-                if (potentialParent->left == nullptr) {
-                    potentialParent->left = curr->treeNode;
-                } else {
-                    potentialParent->right = curr->treeNode;
+        while (current != nullptr) {
+            Node* parentNode = findNodeInTree(root, current->treeNode->id_boss);
+            if (parentNode != nullptr) {
+                if (insertNodeDirectly(parentNode, current->treeNode)) {
+                    ListNode* toDelete = current;
+                    if (prev == nullptr) {
+                        pendingListHead = current->next;
+                    } else {
+                        prev->next = current->next;
+                    }
+                    current = current->next;
+                    delete toDelete;
+                    progress = true;
+                    continue;
                 }
-
-                // Remover de la lista de pendientes
-                ListNode* toDelete = curr;
-                if (prev == nullptr) {
-                    pendingListHead = curr->next;
-                } else {
-                    prev->next = curr->next;
-                }
-                curr = curr->next;
-                delete toDelete; // Borramos el ListNode de apoyo, NO el Node de la mafia.
-                movement = true;
-            } else {
-                prev = curr;
-                curr = curr->next;
             }
+            prev = current;
+            current = current->next;
         }
     }
 }
 
-// Carga el CSV y resuelve las dependencias
 void Tree::loadFromCSV(const string& filename) {
     ifstream file(filename);
     if (!file.is_open()) {
@@ -100,101 +95,238 @@ void Tree::loadFromCSV(const string& filename) {
     }
 
     string line;
-    // Ignorar cabecera
-    getline(file, line);
+    getline(file, line); 
 
     while (getline(file, line)) {
         if (line.empty()) continue;
 
         stringstream ss(line);
-        string temp;
-
+        string item;
+        
         int id, age, id_boss;
         string name, last_name;
         char gender;
         bool is_dead, in_jail, was_boss, is_boss;
 
-        getline(ss, temp, ','); id = stoi(temp);
+        getline(ss, item, ','); id = stoi(item);
         getline(ss, name, ',');
         getline(ss, last_name, ',');
-        getline(ss, temp, ','); gender = temp[0];
-        getline(ss, temp, ','); age = stoi(temp);
-        getline(ss, temp, ','); id_boss = stoi(temp);
-        getline(ss, temp, ','); is_dead = (stoi(temp) == 1);
-        getline(ss, temp, ','); in_jail = (stoi(temp) == 1);
-        getline(ss, temp, ','); was_boss = (stoi(temp) == 1);
-        getline(ss, temp, ','); is_boss = (stoi(temp) == 1);
+        getline(ss, item, ','); gender = item[0];
+        getline(ss, item, ','); age = stoi(item);
+        getline(ss, item, ','); id_boss = (item.empty() || item == "0") ? 0 : stoi(item);
+        getline(ss, item, ','); is_dead = (stoi(item) == 1);
+        getline(ss, item, ','); in_jail = (stoi(item) == 1);
+        getline(ss, item, ','); was_boss = (stoi(item) == 1);
+        getline(ss, item, ','); is_boss = (stoi(item) == 1);
 
         Node* newNode = new Node(id, name, last_name, gender, age, id_boss, is_dead, in_jail, was_boss, is_boss);
 
         if (id_boss == 0) {
-            root = newNode; // Es el Capo di tutti capi
+            root = newNode;
         } else {
             Node* parentNode = findNodeInTree(root, id_boss);
             if (parentNode != nullptr) {
-                newNode->parent = parentNode;
-                if (parentNode->left == nullptr) {
-                    parentNode->left = newNode;
-                } else {
-                    parentNode->right = newNode;
+                if (!insertNodeDirectly(parentNode, newNode)) {
+                    delete newNode;
                 }
             } else {
-                // Si el jefe no se ha cargado todavía, va a la lista de pendientes
                 insertPending(newNode);
             }
         }
     }
     file.close();
-    // Resolver los que quedaron huérfanos temporalmente
     resolvePendingNodes();
 }
 
-
-
-
-// MÉTODOS DE LA FASE 4: VISUALIZACIÓN Y EDICIÓN
-
-// Buscar miembro por ID para edición (interfaz pública)
-Node* Tree::searchMember(int id) {
-    return findNodeInTree(root, id);
+void Tree::showSuccessionLine() {
+    if (root == nullptr) {
+        cout << "La familia no tiene miembros registrados." << endl;
+        return;
+    }
+    cout << "\n--- MIEMBROS VIVOS DE LA FAMILIA ---" << endl;
+    printSuccessionRecursive(root);
+    cout << "------------------------------------" << endl;
 }
 
-// Mostrar línea de sucesión (Solo vivos) en Preorden
 void Tree::printSuccessionRecursive(Node* current) {
     if (current == nullptr) return;
 
     if (!current->is_dead) {
-        cout << "- " << current->name << " " << current->last_name 
-             << " [ID: " << current->id << "] "
-             << (current->is_boss ? " (JEFE ACTUAL)" : "") 
-             << (current->in_jail ? " [EN PRISIÓN]" : "") << endl;
+        cout << "ID: " << current->id << " | " << current->name << " " << current->last_name 
+             << " | Edad: " << current->age << " | ";
+        if (current->is_boss) {
+            cout << "[BOSS ACTUAL]";
+        } else if (current->in_jail) {
+            cout << "[EN PRISION (Sucesion bloqueada)]";
+        } else {
+            cout << "[Sucesor Libre]";
+        }
+        cout << endl;
     }
 
     printSuccessionRecursive(current->left);
     printSuccessionRecursive(current->right);
 }
 
-void Tree::showSuccessionLine() {
-    if (root == nullptr) {
-        cout << "La familia no tiene miembros cargados." << endl;
-        return;
-    }
-    cout << "--- LINEA DE SUCESIÓN ACTUAL (MIEMBROS VIVOS) ---" << endl;
-    printSuccessionRecursive(root);
-    cout << "------------------------------------------------" << endl;
+Node* Tree::searchMember(int id) {
+    return findNodeInTree(root, id);
 }
 
-// Modificar datos (protegiendo id e id_boss)
 bool Tree::modifyMember(int id, string newName, string newLastName, char newGender, int newAge, bool newIsDead, bool newInJail) {
     Node* member = searchMember(id);
     if (member == nullptr) return false;
-
+    
     member->name = newName;
     member->last_name = newLastName;
     member->gender = newGender;
     member->age = newAge;
     member->is_dead = newIsDead;
     member->in_jail = newInJail;
-
     return true;
+}
+
+Node* Tree::findFirstFreeSuccessor(Node* current, bool allowJail) {
+    if (current == nullptr) return nullptr;
+
+    if (!current->is_dead) {
+        if (allowJail || !current->in_jail) {
+            return current;
+        }
+    }
+
+    Node* foundLeft = findFirstFreeSuccessor(current->left, allowJail);
+    if (foundLeft != nullptr) return foundLeft;
+
+    return findFirstFreeSuccessor(current->right, allowJail);
+}
+
+Node* Tree::findNewBossRules(Node* deadBoss) {
+    if (deadBoss == nullptr) return nullptr;
+
+    Node* candidate = nullptr;
+
+    // Regla 1: Primer sucesor libre de su propio árbol
+    candidate = findFirstFreeSuccessor(deadBoss->left);
+    if (candidate != nullptr) return candidate;
+    candidate = findFirstFreeSuccessor(deadBoss->right);
+    if (candidate != nullptr) return candidate;
+
+    Node* formerBoss = deadBoss->parent;
+    if (formerBoss != nullptr) {
+        Node* sibling = (formerBoss->left == deadBoss) ? formerBoss->right : formerBoss->left;
+
+        if (sibling != nullptr) {
+            // Regla 2: Primer sucesor del árbol de su hermano
+            candidate = findFirstFreeSuccessor(sibling);
+            if (candidate != nullptr) return candidate;
+
+            // Regla 3: Hermano libre, vivo y sin descendencia
+            if (!sibling->is_dead && !sibling->in_jail && sibling->left == nullptr && sibling->right == nullptr) {
+                return sibling;
+            }
+        }
+
+        // Regla 4: Árbol del tío (compañero del anterior jefe)
+        Node* grandBoss = formerBoss->parent;
+        if (grandBoss != nullptr) {
+            Node* uncle = (grandBoss->left == formerBoss) ? grandBoss->right : grandBoss->left;
+            if (uncle != nullptr) {
+                candidate = findFirstFreeSuccessor(uncle);
+                if (uncle != nullptr) return candidate;
+
+                if (!uncle->is_dead && !uncle->in_jail && uncle->left == nullptr && uncle->right == nullptr) {
+                    return uncle;
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // REGLA 5 POTENCIADA: ¡Uso de la Cola propia de Luis! (Búsqueda BFS de jefes)
+    // =========================================================================
+    Node* temp = deadBoss->parent;
+    Cola miCola;
+    
+    // Encolamos los niveles superiores para buscar al jefe idóneo más cercano
+    while (temp != nullptr) {
+        miCola.encolar(temp);
+        temp = temp->parent;
+    }
+
+    while (!miCola.esta_vacia()) {
+        Node* currentBossNode = miCola.desencolar();
+        
+        // Evaluamos si el jefe extraído tiene dos sucesores directos
+        if (currentBossNode->left != nullptr && currentBossNode->right != nullptr) {
+            candidate = findFirstFreeSuccessor(currentBossNode->left);
+            if (candidate != nullptr) return candidate;
+            candidate = findFirstFreeSuccessor(currentBossNode->right);
+            if (candidate != nullptr) return candidate;
+        }
+    }
+
+    // Regla 6: Crisis absoluta (Permitir sucesores en prisión)
+    candidate = findFirstFreeSuccessor(deadBoss->left, true);
+    if (candidate != nullptr) return candidate;
+    candidate = findFirstFreeSuccessor(deadBoss->right, true);
+    if (candidate != nullptr) return candidate;
+
+    temp = deadBoss->parent;
+    while (temp != nullptr) {
+        if (!temp->is_dead) return temp;
+        candidate = findFirstFreeSuccessor(temp->left, true);
+        if (candidate != nullptr) return candidate;
+        candidate = findFirstFreeSuccessor(temp->right, true);
+        if (candidate != nullptr) return candidate;
+        temp = temp->parent;
+    }
+
+    return nullptr;
+}
+
+Node* Tree::findActualBoss(Node* current) {
+    if (current == nullptr) return nullptr;
+    if (current->is_boss) return current;
+
+    Node* foundLeft = findActualBoss(current->left);
+    if (foundLeft != nullptr) return foundLeft;
+
+    return findActualBoss(current->right);
+}
+
+void Tree::checkAndHandleSuccession() {
+    Node* currentBoss = findActualBoss(root);
+
+    if (currentBoss == nullptr) {
+        if (root != nullptr) {
+            root->is_boss = true;
+            currentBoss = root;
+        } else {
+            return;
+        }
+    }
+    if (currentBoss->is_dead || currentBoss->in_jail || currentBoss->age > 70) {
+        cout << "\n=============================================" << endl;
+        cout << "   ATENCION: EL CAPO HA DEJADO EL PUESTO" << endl;
+        cout << "=============================================" << endl;
+        cout << "Nombre: " << currentBoss->name << " " << currentBoss->last_name << endl;
+        cout << "Causa: ";
+        if (currentBoss->is_dead) cout << "Fallecimiento." << endl;
+        else if (currentBoss->in_jail) cout << "Encarcelamiento." << endl;
+        else cout << "Retiro por vejez (" << currentBoss->age << " anos)." << endl;
+
+        Node* newBoss = findNewBossRules(currentBoss);
+
+        if (newBoss != nullptr) {
+            currentBoss->is_boss = false;
+            currentBoss->was_boss = true;
+            newBoss->is_boss = true;
+            cout << "---------------------------------------------" << endl;
+            cout << ">>> EL NUEVO DON ES: " << newBoss->name << " " << newBoss->last_name 
+                 << " (ID: " << newBoss->id << ") <<<" << endl;
+            cout << "=============================================\n" << endl;
+        } else {
+            cout << "La familia ha quedado sin un heredero apto." << endl;
+        }
+    }
 }

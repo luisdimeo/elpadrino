@@ -1,13 +1,12 @@
 #ifndef COLA_H
 #define COLA_H
 
-#include "Nodo.h"
+#include "Nodo.hpp"
 
-// Nodo interno de la cola para poder enlazar los elementos
 struct NodoCola {
-    Nodo* nodo_arbol;
+    Node* nodo_arbol;
     NodoCola* siguiente;
-    NodoCola(Nodo* nodo) : nodo_arbol(nodo), siguiente(nullptr) {}
+    NodoCola(Node* nodo) : nodo_arbol(nodo), siguiente(nullptr) {}
 };
 
 class Cola {
@@ -18,7 +17,6 @@ private:
 public:
     Cola() : primero(nullptr), ultimo(nullptr) {}
 
-    // Destructor para evitar fugas de memoria (limpia la cola al terminar)
     ~Cola() {
         while (!esta_vacia()) {
             desencolar();
@@ -29,8 +27,8 @@ public:
         return primero == nullptr;
     }
 
-    // Insertar un miembro al final de la cola (para procesamiento)
-    void encolar(Nodo* nodo) {
+    void encolar(Node* nodo) {
+        if (nodo == nullptr) return;
         NodoCola* temporal = new NodoCola(nodo);
         if (esta_vacia()) {
             primero = ultimo = temporal;
@@ -40,11 +38,10 @@ public:
         ultimo = temporal;
     }
 
-    // Sacar al miembro que va de primero
-    Nodo* desencolar() {
+    Node* desencolar() {
         if (esta_vacia()) return nullptr;
         NodoCola* temporal = primero;
-        Nodo* nodo = temporal->nodo_arbol;
+        Node* nodo = temporal->nodo_arbol;
         primero = primero->siguiente;
         if (primero == nullptr) {
             ultimo = nullptr;
